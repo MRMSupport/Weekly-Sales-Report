@@ -1,0 +1,11 @@
+# build artifacts / test output — do not commit
+*.pdf
+brand_data*.json
+test_*
+fh_sample*
+*_p[0-9].png
+
+# logo_0.png is GENERATED at run start by build_report.py, decoded from the
+# tracked logo_0.png.b64 text asset. Never commit the binary PNG itself —
+# that's what caused the original silent corruption bug.
+logo_0.png
