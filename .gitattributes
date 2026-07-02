@@ -1,0 +1,14 @@
+# Defense-in-depth only. The v2 bundle no longer depends on this file for
+# correctness -- the logo is stored as base64 TEXT (logo_0.png.b64) and
+# decoded to a binary PNG at run start by build_report.py, so line-ending
+# normalization can't corrupt it even if this file is missing from a clone.
+# Kept in case any real binary asset (e.g. a sample PDF) is added later.
+* -text
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.pdf binary
+*.py text eol=lf
+*.md text eol=lf
+*.sh text eol=lf
+.gitignore text eol=lf
