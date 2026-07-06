@@ -1,6 +1,6 @@
 # MegaRhino Weekly Sales Report — repo notes
 
-This repo is cloned by a **Claude Code Routine** every Monday ~10 PM Philippine time to build and draft the weekly Amazon sales report **for every active client brand**. The full task lives in `ROUTINE_PROMPT.md` (paste it as the routine's Instructions).
+This repo is cloned by a **Claude Code Routine** every Monday ~10 PM Philippine time to build and draft the weekly Amazon sales report **for each brand opted in via the "Brand Info" sheet**. The full task lives in `ROUTINE_PROMPT.md` (paste it as the routine's Instructions).
 
 ## Files
 - `build_report.py` — branded reportlab PDF generator. Reads a per-brand JSON file: `python3 build_report.py <data.json> <out.pdf>`. Auto-fits a variable number of product rows and overflows to more pages if needed. Design is final — do not change layout/colors.
@@ -9,8 +9,8 @@ This repo is cloned by a **Claude Code Routine** every Monday ~10 PM Philippine 
 - `ROUTINE_PROMPT.md` — the self-contained multi-brand weekly workflow.
 - `Missive Draft Creator Webhook.gs` — reference copy of the Apps Script that turns a webhook POST into a Missive draft (deployed separately by MegaRhino; not run here).
 
-## Which brands
-All brands from Jarvio `list_brands` EXCEPT `MegaRhino (MR)` (the agency) and `Zoni Pets (ZP)` (wound down). Duplicate entries (same brand_name + marketplace, e.g. GWTD CA) are deduped. Brands with zero sales in the week are skipped.
+## Which brands (sheet-driven)
+Governed by the **"Brand Info" tab** of Google Sheet `1oZw5mSqO2YDvbPkYAcAz6NaO8PJG4RZcxxrVszyb5pY`: report only on rows where **`Weekly Sales Recipient Trigger` = `Yes`**. Read the tab via the **Google Drive connector `read_file_content`** (Jarvio `get_google_sheet` is not authorized on these tenants). Join sheet rows to `list_brands` by **`Brand Code`** (name fallback); log unmatched `Yes` rows and skip them. `MegaRhino (MR)` (agency) and `Zoni Pets (ZP)` (wound down) are **always excluded even if marked `Yes`**. Duplicate entries (same brand_name + marketplace, e.g. GWTD CA) are deduped. Brands with zero sales in the week are still skipped.
 
 ## Product grouping
 - **Firehouse**: hand-defined families (Light / Dark / Tacky) via its SKU map.
@@ -27,7 +27,7 @@ Profit = Net Sales − Total Amazon Charges, order-week basis, using ACTUAL fee 
 Jarvio `sp_api_pull_data` only (never `my_data` — not brand-scoped). Pass each brand's `brand_tenant_id` and use its `marketplace_id`. orderMetrics for client-facing units/revenue (order week); financialEvents for actual fee RATES (settlement-dated) — do not mix the two bases.
 
 ## Delivery
-One PDF + one Missive **draft** per brand. Google Drive connector uploads the PDF → `driveFileId` → direct curl POST to the Apps Script `/exec` webhook with `send:false` and **no recipient** (routed manually in Missive). Always a DRAFT; never auto-send. Brands are processed independently — one failure does not stop the rest.
+One PDF + one Missive **draft** per brand. Google Drive connector uploads the PDF → `driveFileId` → direct curl POST to the Apps Script `/exec` webhook with `send:false`. The draft's **To/Cc come from the sheet's `Weekly Sales Report Recipient TO` / `…CC` columns** (split on commas/semicolons); if a cell is blank, that key is omitted and the draft has no recipient (routed manually in Missive, as before) — a blank TO does not skip the brand. Always a DRAFT; never auto-send, even when recipients are present. Brands are processed independently — one failure does not stop the rest.
 
 ## Requirements
 Python 3 + `reportlab` (installed by `setup.sh`). Network access must allow `script.google.com` and `script.googleusercontent.com` for the webhook (see the setup guide).
