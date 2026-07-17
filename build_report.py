@@ -17,10 +17,18 @@ PROFIT METHOD (v2 - actual fees), unchanged:
   rates from settled financialEvents. Per product line:
      charges = referral_rate*revenue + fba_per_unit*units + other_per_unit*units
   fba_per_unit blends the $3.44 base with the ~$8.50 surcharge units.
-  Ads (Sponsored Products) EXCLUDED.
+  Ads (Sponsored Products) EXCLUDED. Profit reflects only the Amazon fees tied
+  to each order (referral + FBA fulfillment + other per-item fees); it does NOT
+  include advertising, monthly/long-term storage, inbound/removal, or other
+  account-level fees, nor product cost (COGS). Surface this via the optional
+  "disclaimer" field (rendered as a small footnote under the KPI cards).
+
+PRODUCT ROWS: one row per SKU (child ASIN / size-color variation) for every
+brand. No parent-ASIN roll-up and no hand-defined family maps.
 """
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
+from reportlab.pdfbase.pdfmetrics import stringWidth
 import os, sys, json, base64
 
 # ---- palette ----
@@ -59,22 +67,25 @@ def _ensure_logo():
 _ensure_logo()
 
 LM, RM = 50, 562
-COLS = [LM + 8, LM + 210, LM + 300, LM + 392, RM - 78]  # product / units / rev / profit / avail
+COLS = [LM + 8, LM + 205, LM + 285, LM + 365, RM - 66]  # product / units / rev / profit / avail
 HEADS = ["PRODUCT", "UNITS", "REVENUE", "PROFIT", "AVAILABLE"]
 
 # ---- sample data (regenerate per brand from connectors) ----
 DATA = {
     "brand": "Firehouse",
     "period": "June 21–27, 2026",
-    "units": 168, "units_sub": "across 3 product lines",
+    "units": 168, "units_sub": "across 3 SKUs",
     "revenue": 3152.34, "revenue_sub": "net ordered product sales",
     "profit": 2011.66, "profit_sub": "~64% margin after actual Amazon fees",
     "products": [
-        # name, units, revenue, profit, available, green(>=4wks)
+        # name (per SKU), units, revenue, profit, available, green(>=4wks)
         ("Light",  27,  512.73,  330.42, 172, True),
         ("Dark",   41,  759.60,  480.62, 412, True),
         ("Tacky", 100, 1880.01, 1200.62, 892, True),
     ],
+    "disclaimer": ("Profit is after per-order Amazon fees (referral, FBA fulfillment, and other "
+                   "per-item fees) only; it excludes advertising, storage, and other account-level "
+                   "fees and product cost, so actual net profit is lower."),
     "footer": "MegaRhino Marketing & Retail  |  www.megarhino.com  |  support@megarhino.com  |  828.222.3842",
 }
 
@@ -86,6 +97,22 @@ def money(v):
 def clip(s, n):
     s = str(s)
     return s if len(s) <= n else s[: n - 1] + "…"
+
+
+def wrap(text, font, size, maxw):
+    """Greedy word-wrap to fit maxw (points). Returns a list of lines."""
+    lines, cur = [], ""
+    for w in str(text).split():
+        t = (cur + " " + w).strip()
+        if stringWidth(t, font, size) <= maxw:
+            cur = t
+        else:
+            if cur:
+                lines.append(cur)
+            cur = w
+    if cur:
+        lines.append(cur)
+    return lines
 
 
 def row_height(n):
@@ -130,6 +157,14 @@ def draw_page_frame(c, data, first):
         c.drawString(x + 12, y + ch - 48, big)
         c.setFillColorRGB(*GRAY); c.setFont("Helvetica", 8.5)
         c.drawString(x + 12, y + 10, clip(sub, 30))
+
+    disc = data.get("disclaimer", "")
+    if disc:
+        dy = (cy_top - ch) - 15
+        c.setFillColorRGB(*MUTE); c.setFont("Helvetica-Oblique", 7.5)
+        for ln in wrap(disc, "Helvetica-Oblique", 7.5, RM - LM)[:2]:
+            c.drawString(LM, dy, ln); dy -= 9.5
+        return dy - 12
     return cy_top - ch - 34
 
 
@@ -177,8 +212,8 @@ def build(data, out_path):
         c.drawString(COLS[2], cy, money(rev))
         c.drawString(COLS[3], cy, money(prof))
         pill = GREEN if green else REDLT
-        pw, ph = 70, min(18, rh - 4)
-        px = RM - 78; py = y + (rh - ph) / 2
+        pw, ph = 66, min(18, rh - 4)
+        px = COLS[4]; py = y + (rh - ph) / 2
         c.setFillColorRGB(*pill); c.roundRect(px, py, pw, ph, 5, fill=1, stroke=0)
         c.setFillColorRGB(1, 1, 1); c.setFont("Helvetica-Bold", 10 if big_font else 8.5)
         c.drawCentredString(px + pw / 2, py + (ph - 8) / 2, str(avail))

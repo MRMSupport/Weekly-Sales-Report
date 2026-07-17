@@ -83,8 +83,13 @@ function doPost(e) {
         const filename = file.filename || file.name || 'attachment';
         const type = file.media_type || file.mediaType || inferMediaType(filename);
         let data = file.base64_data || file.data || file.file || '';
-        // Missive wants base64_data as a data URI and no separate media_type key.
-        if (data.indexOf('data:') !== 0) data = 'data:' + type + ';base64,' + data;
+        // Missive expects RAW base64 in base64_data (NOT a data: URI). If a data URI
+        // is passed in, strip the leading "data:<type>;base64," so only the base64
+        // payload is sent. BUG FIX: sending the "data:...;base64," text caused Missive
+        // to base64-decode that literal prefix into the file, corrupting every
+        // attachment (fixed 20+ garbage bytes prepended + misaligned bytes).
+        const comma = data.indexOf('base64,');
+        if (data.indexOf('data:') === 0 && comma !== -1) data = data.slice(comma + 'base64,'.length);
         attachments.push({ base64_data: data, filename: filename });
       });
     }
@@ -121,9 +126,11 @@ function attachmentFromDrive(fileId) {
   const file = DriveApp.getFileById(fileId);
   const blob = file.getBlob();
   const type = blob.getContentType() || inferMediaType(file.getName());
-  // Missive attachments: base64_data as a data URI, filename only (no media_type key).
+  // Missive expects RAW base64 in base64_data (NOT a data: URI). Sending a
+  // "data:<type>;base64," prefix caused Missive to decode that literal text into
+  // the file and corrupt every attachment, so we send only the base64 payload here.
   return {
-    base64_data: 'data:' + type + ';base64,' + Utilities.base64Encode(blob.getBytes()),
+    base64_data: Utilities.base64Encode(blob.getBytes()),
     filename: file.getName()
   };
 }
