@@ -13,11 +13,10 @@ Install the PDF dependency once if not already present: `pip install --break-sys
    - `Weekly Sales Report Recipient TO` — draft To recipients (may be blank today).
    - `Weekly Sales Report Recipient CC` — draft Cc recipients (may be blank today). NOTE: this is a different column from `Client Success Recipient CC` — do not confuse them.
    - If `read_file_content` on the sheet fails, STOP the run and report it — brand selection cannot proceed without the sheet, and guessing the brand list is not allowed.
-3. **Keep only** brands whose `Weekly Sales Recipient Trigger` is `Yes` (case-insensitive).
-4. **Always exclude** `MegaRhino (MR)` (the agency itself) and `Zoni Pets (ZP)` (wound down — zero inventory/sales) **even if the sheet marks them `Yes`.**
-5. **Match each opted-in sheet row to a `list_brands` entry by Brand Code** (fallback: brand name). If a `Yes` row has no matching Jarvio brand, or a code matches more than one entry ambiguously, **log it as `unmatched — skipped` and continue** — never guess.
-6. **Dedupe:** some brands appear more than once in `list_brands` (e.g. `Girl With The Dogs CA` has two tenant IDs on the same marketplace). Collapse entries with the same `brand_name` + `marketplace_id` to a single `brand_tenant_id`. If data pulls fail on the chosen ID, fall back to the other.
-7. For each remaining brand keep `brand_name`, `brand_tenant_id`, `marketplace_id`, plus the sheet's `TO` and `CC` strings. That is the client set to report on.
+3. **Keep only** brands whose `Weekly Sales Recipient Trigger` is `Yes` (case-insensitive). The sheet is the sole authority on which brands run — do not hardcode any brand in or out.
+4. **Match each opted-in sheet row to a `list_brands` entry by Brand Code** (fallback: brand name). If a `Yes` row has no matching Jarvio brand, or a code matches more than one entry ambiguously, **log it as `unmatched — skipped` and continue** — never guess.
+5. **Dedupe:** some brands appear more than once in `list_brands` (e.g. `Girl With The Dogs CA` has two tenant IDs on the same marketplace). Collapse entries with the same `brand_name` + `marketplace_id` to a single `brand_tenant_id`. If data pulls fail on the chosen ID, fall back to the other.
+6. For each remaining brand keep `brand_name`, `brand_tenant_id`, `marketplace_id`, plus the sheet's `TO` and `CC` strings. That is the client set to report on.
 
 ## B. Reporting week
 For each brand, the week is the most recent completed **Sunday 00:00 → Saturday 23:59 in that brand's marketplace timezone** (US-Pacific for `ATVPDKIKX0DER`; Canada `A2EUQ1WTGCTBG2` uses its own local time). Use `orderMetrics` intervals so the timezone is handled. Compute the exact dates from today and use them as the period label (e.g. "June 21–27, 2026").

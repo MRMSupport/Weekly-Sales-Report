@@ -56,7 +56,7 @@ Connectors and environment settings do **not** carry over from a personal accoun
 5. **Missive webhook still live:** open the `/exec` URL in a browser; a healthy deploy returns `{"status":"ok",...}`. The token/URL in this bundle are unchanged.
 
 ### 6. Test before trusting it
-Open the routine → **Run now**, then open the run session and read the transcript (don't trust the green dot). Confirm it: read the Brand Info sheet; built the opted-in brand list (MR and Zoni excluded, GWTD CA deduped); and for at least the first couple of brands pulled data, built the PDF, attached it (Drive or inline-fallback), got `status:success 201`, and left a Missive **draft** (not sent). Check the end-of-run summary shows every brand as drafted / skipped-no-sales / reconcile-failed — none should silently vanish. Fix the environment if any webhook 403'd.
+Open the routine → **Run now**, then open the run session and read the transcript (don't trust the green dot). Confirm it: read the Brand Info sheet; built the opted-in brand list purely from the sheet's `Weekly Sales Recipient Trigger = Yes` rows (no brand hardcoded in or out; GWTD CA deduped); and for at least the first couple of brands pulled data, built the PDF, attached it (Drive or inline-fallback), got `status:success 201`, and left a Missive **draft** (not sent). Check the end-of-run summary shows every brand as drafted / skipped-no-sales / reconcile-failed — none should silently vanish. Fix the environment if any webhook 403'd.
 
 ### 7. Disable the old desktop task
 Once a Run-now produces correct drafts, disable the local task `firehouse-weekly-sales-report` (Cowork → Scheduled tasks) so it doesn't double-draft Firehouse. Keep it — don't delete — until you've seen a real Monday cloud run land.
