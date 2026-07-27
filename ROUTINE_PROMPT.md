@@ -1,8 +1,21 @@
-Build the MegaRhino weekly per-brand sales report for **each brand the "Brand Info" sheet has opted in** (see Section A), one PDF and one Missive **DRAFT (do NOT send)** per brand. This routine fires Monday ~10 PM Philippine time (≈ Monday morning US-Pacific), so the prior week's fees have settled.
+Build the MegaRhino weekly per-brand sales report for **each brand the "Brand Info" sheet has opted in** (see Section A). For each brand you generate a self-contained **HTML report** and **enqueue one Missive DRAFT** — you do NOT send email yourself and you do NOT POST to any webhook. Enqueuing means writing one job JSON into a Google Drive **outbox** folder; a separate Google Apps Script "queue mailer" polls that folder, renders the PDF from your HTML on Google's side, and creates the Missive draft (never sends). Enqueuing uses the **Google Drive connector**, which is exempt from the sandbox egress allowlist, so delivery no longer depends on network egress, a webhook, or a browser. This routine fires Monday ~10 PM Philippine time (≈ Monday morning US-Pacific), so the prior week's fees have settled.
 
-You are running autonomously in a Claude Code cloud session with the repository cloned to the working directory. `build_report.py` and `logo_0.png.b64` are in the repo root; the script decodes the logo to `logo_0.png` itself at run start, so you don't need to do anything with it. Do not ask for approval. Process brands independently: if one brand fails, log it and continue to the next. At the end, print a summary of every brand and its outcome.
+You are running autonomously in a Claude Code cloud session with the repository cloned to the working directory. `build_report.py` and `logo_0.png.b64` are in the repo root; the builder inlines the logo from `logo_0.png.b64` itself, so you don't need to do anything with it. Do not ask for approval. Process brands independently: if one brand fails, log it and continue to the next. At the end, print a summary of every brand and its outcome.
 
-Install the PDF dependency once if not already present: `pip install --break-system-packages reportlab`.
+`build_report.py` is **pure Python (standard library only)** — there is nothing to `pip install`. reportlab, ghostscript, and qpdf are no longer used (the queue mailer renders the PDF, not this routine).
+
+**Config values:**
+- `OUTBOX_FOLDER_ID = 1Va4VHJFydqAjq9piydQFdeVnPElszFDD` — the Google Drive folder the queue mailer polls. Drop each brand's job JSON here. (This is the SAME outbox the Client Success queue mailer uses; the mailer processes every job regardless of type.)
+- `LEDGER_FOLDER_ID = 1cR4lDuXpctVaA9q5Qs4VSrw9vsK95A9x` — the Drive folder holding the Weekly Sales dedup ledger `weekly_sales_sent.json`. **This is a DIFFERENT file from Client Success's `sent_reports.json`, and it must NOT live in the outbox** — the mailer treats every `.json` in the outbox as a job to send, so a ledger dropped there would be mis-sent and archived.
+- Job send fields (written into every job): `sendApp = Missive` · `sendType = Draft` · `sendAs = support@megarhino.com`. The mailer leaves it as a Missive draft (never auto-sends) because `sendType` contains "draft".
+
+---
+
+## STEP 0 — Preflight: confirm the outbox is reachable (DO THIS FIRST)
+
+No network egress is needed — sending happens later, in the queue mailer, via Google. But confirm you can write to the queue before building anything, so a misconfigured folder ID fails fast. Using the Google Drive connector, verify `OUTBOX_FOLDER_ID` resolves (e.g. `get_file_metadata` on that ID, or `search_files` scoped to it). If it does not resolve, **STOP immediately** — do not read the calendar/sheet or pull any data. Report that the outbox is not reachable and end the run. Otherwise proceed.
+
+---
 
 ## A. Build the opted-in brand list (sheet-driven)
 1. Jarvio `list_brands` — this is the full universe of brands and their `brand_tenant_id` / `marketplace_id`.
@@ -25,7 +38,7 @@ For each brand, the week is the most recent completed **Sunday 00:00 → Saturda
 
 ### 1. Units + net revenue (client-facing headline)
 `sp_api_pull_data` → `/sales/v1/orderMetrics` for the ORDER week, per ASIN (`granularity=Total`, iterate `asin=`), plus the account total to reconcile against. Revenue already nets promotions.
-- **If total units = 0 → SKIP this brand** (record it as "skipped — no sales"; create no PDF, no draft).
+- **If total units = 0 → SKIP this brand** (record it as "skipped — no sales"; create no HTML, enqueue nothing).
 
 ### 2. Product lines — one row per SKU
 Report **one row per SKU (child ASIN / size-color variation) for EVERY brand** — no parent-ASIN roll-up and no hand-defined family maps. This applies to Firehouse too (its old Light/Dark/Tacky family map is retired). Keep each child ASIN that had sales in the week as its own line; drop SKUs with zero units. Units and revenue are already per-ASIN from step 1. For the display name, pull the item title from `asin_information` and use the variation label (size/color, or the 2-pack descriptor) so each row is distinguishable, trimmed.
@@ -43,17 +56,12 @@ Report **one row per SKU (child ASIN / size-color variation) for EVERY brand** �
 ### 5. Profit
 Per SKU: `profit = revenue − (referral_rate·revenue + fba_per_unit·units + other_per_unit·units)`. Brand totals = sums of SKUs; margin = total profit / total revenue. This is profit after per-order Amazon fees only — see the disclaimer in step 6.
 
-### 6. Build the PDF
-Write a per-brand JSON file, then run the generalized builder (it auto-fits any number of product rows and overflows to more pages if needed — do not hand-tune layout):
+### 6. Build the HTML report
+Write a per-brand JSON file, then run the generalized builder to emit a **self-contained HTML report** (it auto-fits any number of product rows; the queue mailer paginates the PDF automatically — do not hand-tune layout):
 ```
-python3 build_report.py brand_data.json _raw.pdf
+python3 build_report.py brand_data.json email_body_<CODE>.html
 ```
-Then **normalize `_raw.pdf` into the final delivered PDF** (required). reportlab emits an ASCII85-heavy PDF; rewrite it to a standard, linearized binary PDF so it opens reliably in every viewer. Install `ghostscript`/`qpdf` once if missing (`apt-get install -y ghostscript qpdf`):
-```
-gs -sDEVICE=pdfwrite -dCompatibilityLevel=1.7 -dNOPAUSE -dBATCH -dQUIET -dAutoRotatePages=/None -sOutputFile=_gs.pdf _raw.pdf
-qpdf --linearize --object-streams=generate _gs.pdf "<Brand> - Weekly Sales Statistics (<period>).pdf"
-```
-Assert the final file starts with `%PDF` and `qpdf --check` reports no syntax/stream errors; if either fails, record the brand as `pdf-normalize-failed` and create no draft. (Context: attachments once arrived "Failed to load"; the real cause was the webhook, not the PDF — see step 8 and `CLAUDE.md` — but a standard PDF is still what we deliver.)
+The HTML is BOTH the email body and the source the queue mailer renders into the attached PDF, so it must stay **self-contained and print-clean**: inline styles only, no `<table>`, no `<style>` blocks, no remote images (the builder already follows these rules and inlines the logo as a base64 data URI). Verify the output: `grep -c '<table' email_body_<CODE>.html`, `grep -c '<style' email_body_<CODE>.html`, and `grep -c 'undefined' email_body_<CODE>.html` must all return 0.
 
 `brand_data.json` schema (see `sample_data.json` for a working example):
 ```
@@ -71,47 +79,50 @@ Assert the final file starts with `%PDF` and `qpdf --check` reports no syntax/st
 - `products` is **one row per SKU** (child ASIN), ordered however you like (revenue-descending reads well). `units_sub` should read `across <N> SKUs`.
 - **Always include the `disclaimer` field** with the exact standard text above — the builder renders it as a small footnote beneath the KPI cards so the profit figure is never read as true net profit.
 
-### 7. Verify before drafting
-Confirm the per-SKU profits sum to the brand total and units/revenue reconcile to the orderMetrics account total (within rounding). **If it does not reconcile, do NOT create a draft for that brand** — record a discrepancy in the summary and move on. Never draft numbers you could not verify.
+### 7. Verify before enqueuing
+Confirm the per-SKU profits sum to the brand total and units/revenue reconcile to the orderMetrics account total (within rounding). **If it does not reconcile, do NOT enqueue that brand** — record a discrepancy in the summary and move on. Never enqueue numbers you could not verify.
 
-### 8. Create the Missive draft (direct webhook — no browser; To/Cc from the sheet)
-The webhook can attach the PDF two ways. Use the Drive path first; if it fails, fall back to inline base64 so the draft still lands. **The Apps Script webhook hands the file to Missive as RAW base64 (no `data:` URI).** This was a fix: a prior version wrapped the bytes as `data:application/pdf;base64,…`, Missive base64-decoded that whole string (including the literal `data:…;base64,` text) into the file, and every attachment arrived corrupted ("Failed to load PDF document"). Do NOT reintroduce a `data:` URI wrapper in `payload.json` or in the `.gs` — send only the bare base64. See `CLAUDE.md` for the full root cause.
+### 8. Enqueue the Missive draft (drop a job into the Drive outbox)
+You do not send email and you do not call a webhook. For each brand, write one job JSON into the outbox; the queue mailer renders the PDF from the HTML and creates the Missive draft. To/Cc come from the sheet.
 
-**a. Primary — upload to Drive.** Upload the finished PDF to Google Drive via the Google Drive connector (`create_file`, base64 content, mime `application/pdf`, disable conversion to Google type). Capture the Drive file `id`. Build `payload.json` with a top-level `"driveFileId": "<id>"`.
+**8-pre — Skip already-enqueued (dedup gate).** The canonical Weekly Sales ledger is `weekly_sales_sent.json` in `LEDGER_FOLDER_ID` (a compact object `{ "<key>": "<ISO enqueuedAt>" }`). Load it via the Drive connector (`search_files` for the title within `LEDGER_FOLDER_ID`, then `read_file_content`/`download_file_content`, parse JSON; treat a missing file as `{}`). **Corruption guard:** if the file EXISTS but does not parse, STOP and report it (do not treat as `{}` — that would re-enqueue). Build this brand's key `<CODE>__<weekStartYYYY-MM-DD>` (weekStart = the Sunday that begins the reporting week). If the key already exists, SKIP this brand (record "skipped — already enqueued"). Only enqueue keys not yet in the ledger.
 
-**b. Fallback — inline base64 (only if 8a fails).** If the Drive upload errors (connector unavailable, permission/quota error, etc.), skip `driveFileId` and instead base64-encode the PDF file yourself and put it in an `attachments` array:
-```
-"attachments": [ { "base64_data": "<base64 of the PDF>", "filename": "<Brand> - Weekly Sales Statistics (<period>).pdf", "media_type": "application/pdf" } ]
-```
-The webhook accepts either shape; do NOT send both for the same draft. Note the fallback was used in the final summary for that brand.
-
-**c. POST directly to the Apps Script webhook with curl** (follow redirects; Apps Script requires `text/plain`):
-```
-EXEC="https://script.google.com/macros/s/AKfycbwluzQW0Hz4_LSKAZQZ4Gowb8QF47NCZNIjyO92R5k7UXN8WXxRj5pdpbfXa5XeGADCQQ/exec"
-curl -sL -X POST "$EXEC" -H "Content-Type: text/plain;charset=utf-8" --data @payload.json
-```
-`payload.json` — set `to`/`cc` from this brand's sheet columns:
-```
-{
-  "subject": "<Brand> — Weekly Sales Report (<period>)",
-  "body": "<HTML cover note with the brand's units / revenue / profit highlights>",
-  "from": { "name": "MegaRhino Marketing & Retail", "email": "support@megarhino.com" },
-  "to": [ {"email": "<from Weekly Sales Report Recipient TO>"} ],
-  "cc": [ {"email": "<from Weekly Sales Report Recipient CC>"} ],
-  "driveFileId": "<id from 8a>",   // OR "attachments": [...] from 8b — never both
-  "send": false
+**8a — Build and write the job.** Gzip+base64 the HTML (keeps the job under Drive's ~16 KB `create_file` truncation cliff), then assemble the job JSON. In Python:
+```python
+import gzip, base64, json, datetime
+html = open(f"email_body_{CODE}.html", "rb").read()
+htmlBodyGz = base64.b64encode(gzip.compress(html)).decode()          # gzip → base64
+job = {
+    "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
+    "sendType": "Draft",                                             # Missive DRAFT, never send
+    "sendApp":  "Missive",
+    "sendAs":   "support@megarhino.com",
+    "subject":  f"{BRAND} — Weekly Sales Report ({PERIOD})",
+    "htmlBodyGz": htmlBodyGz,                                        # NOT htmlBody
+    # The mailer splits the attachments field on commas/newlines, so the
+    # attachment FILENAME must contain NO comma (the period label "June 21–27,
+    # 2026" has one). Strip commas from the filename — the en-dash is fine.
+    "attachments": "PDF_FROM_HTML:" + f"{BRAND} - Weekly Sales Statistics ({PERIOD}).pdf".replace(",", ""),
 }
+if TO_RESOLVED: job["to"] = TO_RESOLVED   # sheet "Weekly Sales Report Recipient TO", comma-separated; OMIT if blank
+if CC_RESOLVED: job["cc"] = CC_RESOLVED   # sheet "Weekly Sales Report Recipient CC", comma-separated; OMIT if blank
+base64Content = base64.b64encode(json.dumps(job).encode("utf-8")).decode()
+assert len(base64Content) < 15000, "job too large after gzip — report brand as not-enqueued for manual handling"
 ```
-   - Split the TO and CC cells on commas/semicolons into one `{"email": ...}` object per address; trim whitespace.
-   - **If the TO cell is blank, omit the `to` key entirely** (create the draft with no recipient, routed manually in Missive — matches current practice). Likewise omit `cc` if that cell is blank. A blank TO is NOT a reason to skip the brand — still build the PDF and the draft.
+- `to`/`cc` are plain comma-separated strings (the mailer splits them itself). **A blank TO does NOT skip the brand** — enqueue it with no `to` field; the draft lands in Missive with no recipient, routed manually (matches current practice).
+- `attachments` is the literal marker `PDF_FROM_HTML:<filename>.pdf` — this tells the mailer to render the PDF from the (decompressed) HTML and attach it under that name. Do NOT put a Drive fileId here and do NOT upload a PDF.
 
-**d. If the sandbox blocks the POST, fall back to Claude in Chrome.** If curl returns a proxy `403` / `host_not_allowed` / "blocked-by-allowlist" (the sandbox egress does not permit `script.google.com`), do NOT just stop — re-issue the *same* POST from the browser, but only if the Claude-in-Chrome tools exist in this run. Navigate a tab to a normal page (e.g. `https://example.com`), then via `javascript_tool`:
-```
-fetch(EXEC, {method:"POST", headers:{"Content-Type":"text/plain;charset=utf-8"}, body:<payload JSON>, redirect:"follow"})
-```
-Apps Script cold-starts can exceed a tool's timeout, so kick the fetch off storing its result on `window.__draft`, then poll `window.__draft` in a later call rather than awaiting inline; if a tab becomes unresponsive, open a fresh tab. Classify the outcome: **success** (`{"status":"success"}`) → done; **definitive block and no Chrome available** → report the brand `unsent`; **ambiguous / timeout** → report `unconfirmed` and do NOT retry (a retry risks a duplicate draft). Proper long-term fix: enable network egress for `script.google.com` (Org settings → Capabilities → Code execution) — note it applies to newly-started sessions, not one already running. See `SETUP_GUIDE.md`.
+Then write it into the outbox with the Google Drive connector `create_file`:
+- `parentId` = `OUTBOX_FOLDER_ID`
+- `title` = `job_weekly_<CODE>_<YYYY-MM-DD>.json` (the `weekly_` prefix distinguishes it from Client Success jobs in the shared outbox; unique per brand + week)
+- `contentMimeType` = `application/json`, `disableConversionToGoogleType: true`
+- `base64Content` = the value computed above.
 
-**e. Confirm & verify delivery integrity.** The webhook response must be `status: success`, code `201`. **Never set `send: true`** — always a DRAFT even when recipients are present; MegaRhino reviews and sends in Missive. Then verify the file did not corrupt on the way to Drive: re-download it via the Google Drive connector (`download_file_content` on the `driveFileId`), base64-decode, and confirm it is byte-identical to the local normalized PDF and starts with `%PDF`. If it does not match, flag the brand `delivery-corrupted` in the summary and investigate before trusting the draft. **Limitation:** this checks the upload/Drive round-trip and the webhook contract (raw base64), but the routine runs headless and cannot open Missive — so the *rendered* Missive attachment can only be confirmed by a human. Note in the summary that a person should spot-check at least one brand's attachment opens.
+**Size guard:** if `len(base64Content) >= 15000` (an unusually huge catalog even after gzip), do NOT write a truncated job — report the brand as **not enqueued (body too large after gzip)** and skip it.
+
+**Verify:** re-read the job file back (`read_file_content`) and confirm it parses as JSON. A truncated/corrupt read means the brand was NOT enqueued — report it as **not enqueued** and do not record it in the ledger.
+
+**8b — Record the ledger.** On a confirmed write, add the brand's key to the ledger with the ISO enqueue time (`ledger[key] = "<ISO now>"`), prune any entry older than 60 days, and write the compact JSON back with `create_file` (`parentId = LEDGER_FOLDER_ID`, `title = "weekly_sales_sent.json"`, `contentMimeType = "application/json"`, `disableConversionToGoogleType: true`). Re-read to confirm it parses and contains the new key; if not, report the brand **enqueued-but-unrecorded** so a human can fix the ledger before the next run (do not re-enqueue). Do this immediately after each enqueue, not batched, so an overlapping run cannot double-enqueue.
 
 ## Final summary
-Print one row per brand: name, outcome (**drafted** / skipped-not-opted-in / skipped-no-sales / unmatched-skipped / reconcile-failed / pdf-normalize-failed / delivery-corrupted / unsent / unconfirmed / error), units, revenue, profit, margin, To/Cc used (or "none"), attachment path used (drive / inline-fallback), send path (curl / chrome), delivery-integrity (ok / corrupted / not-checked), Drive file id (if any), Missive draft id. Remind the reader to open at least one draft's PDF attachment as a human spot-check. Also list any `Yes` sheet rows that did not match a Jarvio brand. State clearly that only DRAFTS were created and nothing was emailed.
+Print one row per brand: name, outcome (**enqueued** / skipped-not-opted-in / skipped-no-sales / unmatched-skipped / skipped-already-enqueued / reconcile-failed / not-enqueued / enqueued-but-unrecorded / error), units, revenue, profit, margin, To/Cc used (or "none"), and the job filename written to the outbox. Also list any `Yes` sheet rows that did not match a Jarvio brand. State clearly that this routine only **enqueues** Missive DRAFTS — the queue mailer creates the actual drafts asynchronously (on its ~10-minute trigger) and nothing is auto-sent. Recommend a human spot-check that at least one brand's draft appeared in Missive with its PDF attachment.
