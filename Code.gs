@@ -178,7 +178,25 @@ function buildAttachments_(attachSpec, html, subject, attachmentsFolder) {
   if (!spec) return out;
   var parts = spec.split(/[,\n]+/).map(function (s) { return s.trim(); }).filter(Boolean);
   parts.forEach(function (p) {
-    if (/^PDF_FROM_HTML/i.test(p)) {
+    if (/^PDF_FROM_HTML_GZ:/i.test(p)) {
+      // Render the PDF from a gzip+base64 report HTML carried INSIDE the marker
+      // (so the email body can be a separate short cover note, and the full
+      // report never has to fit in a Sheets cell). Format:
+      //   PDF_FROM_HTML_GZ:<gzip-base64 of report html>::<filename>.pdf
+      // Checked BEFORE the plain PDF_FROM_HTML branch (that regex also matches
+      // this prefix). base64 contains no comma/newline, so the split above keeps
+      // this as one part; the filename must be comma-free.
+      var body = p.replace(/^PDF_FROM_HTML_GZ:/i, '');
+      var sep = body.lastIndexOf('::');
+      var gz = (sep >= 0 ? body.slice(0, sep) : body).trim();
+      var nm = (sep >= 0 ? body.slice(sep + 2) : (subject || 'report')).trim();
+      if (!/\.pdf$/i.test(nm)) nm += '.pdf';
+      var gzBlob = Utilities.newBlob(Utilities.base64Decode(gz), 'application/x-gzip', 'report.html.gz');
+      var reportHtml = Utilities.ungzip(gzBlob).getDataAsString('UTF-8');
+      var pdf = renderPdfFromHtml_(reportHtml, nm);
+      if (attachmentsFolder) { try { attachmentsFolder.createFile(pdf); } catch (e) {} }
+      out.push(pdf);
+    } else if (/^PDF_FROM_HTML/i.test(p)) {
       var name = (p.split(':')[1] || (subject || 'report')).trim();
       if (!/\.pdf$/i.test(name)) name += '.pdf';
       var pdf = renderPdfFromHtml_(html, name);

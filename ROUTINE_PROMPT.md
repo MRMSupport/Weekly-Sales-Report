@@ -56,12 +56,12 @@ Report **one row per SKU (child ASIN / size-color variation) for EVERY brand** �
 ### 5. Profit
 Per SKU: `profit = revenue − (referral_rate·revenue + fba_per_unit·units + other_per_unit·units)`. Brand totals = sums of SKUs; margin = total profit / total revenue. This is profit after per-order Amazon fees only — see the disclaimer in step 6.
 
-### 6. Build the HTML report
-Write a per-brand JSON file, then run the generalized builder to emit a **self-contained HTML report** (it auto-fits any number of product rows; the queue mailer paginates the PDF automatically — do not hand-tune layout):
+### 6. Build the report + cover-note HTML
+Write a per-brand JSON file, then run the builder to emit TWO self-contained HTML files — the full report (rendered into the attached PDF) and a short branded cover note (the email body):
 ```
-python3 build_report.py brand_data.json email_body_<CODE>.html
+python3 build_report.py brand_data.json report_<CODE>.html cover_<CODE>.html
 ```
-The HTML is BOTH the email body and the source the queue mailer renders into the attached PDF, so it must stay **self-contained and print-clean**: inline styles only, no `<table>`, no `<style>` blocks, no remote images (the builder already follows these rules and inlines the logo as a base64 data URI). Verify the output: `grep -c '<table' email_body_<CODE>.html`, `grep -c '<style' email_body_<CODE>.html`, and `grep -c 'undefined' email_body_<CODE>.html` must all return 0.
+Both are **table-based with inline styles and `bgcolor` fills** (the builder handles this — do not hand-tune). This layout is required because both render engines — Missive's email view and Google's HTML→PDF converter — ignore CSS `background-color` on divs and mishandle `inline-block`; `bgcolor` on table cells and `border` both render reliably, and a white-background wrapper keeps the body legible in email dark mode. The logo is inlined as a small base64 data URI. Verify: `grep -c '<style' report_<CODE>.html cover_<CODE>.html` and `grep -c 'undefined' report_<CODE>.html cover_<CODE>.html` must all return 0.
 
 `brand_data.json` schema (see `sample_data.json` for a working example):
 ```
@@ -87,30 +87,33 @@ You do not send email and you do not call a webhook. For each brand, write one j
 
 **8-pre — Skip already-enqueued (dedup gate).** The canonical Weekly Sales ledger is `weekly_sales_sent.json` in `LEDGER_FOLDER_ID` (a compact object `{ "<key>": "<ISO enqueuedAt>" }`). Load it via the Drive connector (`search_files` for the title within `LEDGER_FOLDER_ID`, then `read_file_content`/`download_file_content`, parse JSON; treat a missing file as `{}`). **Corruption guard:** if the file EXISTS but does not parse, STOP and report it (do not treat as `{}` — that would re-enqueue). Build this brand's key `<CODE>__<weekStartYYYY-MM-DD>` (weekStart = the Sunday that begins the reporting week). If the key already exists, SKIP this brand (record "skipped — already enqueued"). Only enqueue keys not yet in the ledger.
 
-**8a — Build and write the job.** Gzip+base64 the HTML (keeps the job under Drive's ~16 KB `create_file` truncation cliff), then assemble the job JSON. In Python:
+**8a — Build and write the job.** Gzip+base64 the cover note (→ email body) and the full report (→ carried inside the `attachments` marker, so the mailer renders the PDF from it and the body stays a light cover note). Gzipping keeps the job under Drive's ~16 KB `create_file` truncation cliff and keeps every value under the 50k-char Google Sheets cell limit. In Python:
 ```python
 import gzip, base64, json, datetime
-html = open(f"email_body_{CODE}.html", "rb").read()
-htmlBodyGz = base64.b64encode(gzip.compress(html)).decode()          # gzip → base64
+def gz(path): return base64.b64encode(gzip.compress(open(path, "rb").read())).decode()
+cover_gz  = gz(f"cover_{CODE}.html")     # short cover note → email body
+report_gz = gz(f"report_{CODE}.html")    # full report → the mailer renders the PDF from this
+# The mailer splits the attachments field on commas/newlines, so the FILENAME
+# must contain NO comma (the period label "June 21–27, 2026" has one). base64
+# itself never contains a comma. Strip commas from the filename; en-dash is fine.
+pdf_name = f"{BRAND} - Weekly Sales Statistics ({PERIOD}).pdf".replace(",", "")
 job = {
     "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
     "sendType": "Draft",                                             # Missive DRAFT, never send
     "sendApp":  "Missive",
     "sendAs":   "support@megarhino.com",
     "subject":  f"{BRAND} — Weekly Sales Report ({PERIOD})",
-    "htmlBodyGz": htmlBodyGz,                                        # NOT htmlBody
-    # The mailer splits the attachments field on commas/newlines, so the
-    # attachment FILENAME must contain NO comma (the period label "June 21–27,
-    # 2026" has one). Strip commas from the filename — the en-dash is fine.
-    "attachments": "PDF_FROM_HTML:" + f"{BRAND} - Weekly Sales Statistics ({PERIOD}).pdf".replace(",", ""),
+    "htmlBodyGz": cover_gz,                                          # cover note = the email body
+    "attachments": f"PDF_FROM_HTML_GZ:{report_gz}::{pdf_name}",      # mailer decompresses & renders the PDF
 }
 if TO_RESOLVED: job["to"] = TO_RESOLVED   # sheet "Weekly Sales Report Recipient TO", comma-separated; OMIT if blank
 if CC_RESOLVED: job["cc"] = CC_RESOLVED   # sheet "Weekly Sales Report Recipient CC", comma-separated; OMIT if blank
 base64Content = base64.b64encode(json.dumps(job).encode("utf-8")).decode()
 assert len(base64Content) < 15000, "job too large after gzip — report brand as not-enqueued for manual handling"
 ```
+- `htmlBodyGz` is the COVER note (the mailer decompresses it into the email body). The full report rides gzipped inside `attachments` — do NOT also put the report in `htmlBodyGz`.
+- `attachments` is `PDF_FROM_HTML_GZ:<gzip-base64 of the report>::<comma-free filename>.pdf`. This tells the mailer to decompress that report HTML and render the attached PDF from it. Do NOT put a Drive fileId here and do NOT upload a PDF.
 - `to`/`cc` are plain comma-separated strings (the mailer splits them itself). **A blank TO does NOT skip the brand** — enqueue it with no `to` field; the draft lands in Missive with no recipient, routed manually (matches current practice).
-- `attachments` is the literal marker `PDF_FROM_HTML:<filename>.pdf` — this tells the mailer to render the PDF from the (decompressed) HTML and attach it under that name. Do NOT put a Drive fileId here and do NOT upload a PDF.
 
 Then write it into the outbox with the Google Drive connector `create_file`:
 - `parentId` = `OUTBOX_FOLDER_ID`

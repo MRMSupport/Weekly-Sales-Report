@@ -9,9 +9,13 @@ Delivery uses the **outbox → queue mailer** pattern: the routine drops a job J
 Routines require **Claude Code on the web enabled** on your plan (Pro, Max, Team, or Enterprise; research preview). Turn it on at [claude.ai/code](https://claude.ai/code) (connect GitHub when prompted). On **Team/Enterprise**, an Owner must not have the Routines toggle off at claude.ai/admin-settings/claude-code. If step 2 below shows no cloud option, this is the blocker.
 
 ## One-time: deploy / update the queue mailer (`Code.gs`)
-The queue mailer is a Google Apps Script that MegaRhino owns; it is the SAME script the Client Success reports use. Weekly Sales reuses its outbox and only needed one change — its `sendViaMissive_` now creates the Missive draft directly against the Missive API (the old version POSTed to an unconfigured webhook). Update it once:
+The queue mailer is a Google Apps Script that MegaRhino owns; it is the SAME script the Client Success reports use. Weekly Sales reuses its outbox and needed **two** changes (both in `Code.gs` here), and nothing else is touched:
+- `sendViaMissive_` now creates the Missive draft directly against the Missive API (the old version POSTed to an unconfigured webhook). The Missive token/org are baked into that function, ported from the old standalone webhook.
+- `buildAttachments_` gained an additive `PDF_FROM_HTML_GZ:` branch so it can render the PDF from a gzipped report HTML carried in the marker (letting the email body be a separate short cover note). The existing `PDF_FROM_HTML` / URL / Drive-fileId paths and the Gmail path are unchanged, so Client Success is unaffected.
+
+Update it once:
 1. Open the Apps Script project that owns the queue mailer (the one whose `runQueue` trigger polls `OUTBOX_FOLDER_ID = 1Va4VHJFydqAjq9piydQFdeVnPElszFDD`).
-2. Replace its `sendViaMissive_` function with the version in `Code.gs` here (everything else is unchanged — you can paste the whole file if you prefer). The Missive token/org are baked into that function, ported from the old standalone webhook.
+2. Replace its `sendViaMissive_` and `buildAttachments_` functions with the versions in `Code.gs` here (or paste the whole file — every other function is byte-identical to what you're running).
 3. Save. If the 10-minute `runQueue` trigger isn't installed yet, run `setupTrigger` once.
 4. The old standalone **"Missive Draft Creator" webhook is retired** — it is no longer called by anything. You can leave it deployed or delete it; nothing here depends on it.
 
@@ -57,7 +61,7 @@ Connectors do **not** carry over from a personal account — they are per-accoun
 4. **Queue mailer deployed** with the updated `sendViaMissive_` (see "One-time" above), and its `runQueue` trigger active.
 
 ### 6. Test before trusting it
-Open the routine → **Run now**, then open the run session and read the transcript (don't trust the green dot). Confirm it: passed the STEP 0 outbox preflight; read the Brand Info sheet; built the opted-in brand list purely from `Weekly Sales Recipient Trigger = Yes` rows (no brand hardcoded in or out; GWTD CA deduped); and for at least the first couple of brands pulled data, built the HTML (0 `<table>` / 0 `undefined`), wrote a `job_weekly_<CODE>_<date>.json` to the outbox, verified the read-back parsed, and recorded the ledger key. Then wait for the queue mailer's next ~10-minute cycle and confirm the Missive **draft** appeared with its PDF attachment (not sent). Check the end-of-run summary shows every brand as enqueued / skipped-no-sales / reconcile-failed — none should silently vanish.
+Open the routine → **Run now**, then open the run session and read the transcript (don't trust the green dot). Confirm it: passed the STEP 0 outbox preflight; read the Brand Info sheet; built the opted-in brand list purely from `Weekly Sales Recipient Trigger = Yes` rows (no brand hardcoded in or out; GWTD CA deduped); and for at least the first couple of brands pulled data, built the report + cover HTML (0 `<style>` / 0 `undefined`), wrote a `job_weekly_<CODE>_<date>.json` to the outbox, verified the read-back parsed, and recorded the ledger key. Then wait for the queue mailer's next ~10-minute cycle and confirm the Missive **draft** appeared with its PDF attachment (not sent). Check the end-of-run summary shows every brand as enqueued / skipped-no-sales / reconcile-failed — none should silently vanish.
 
 ### 7. Disable the old desktop task
 Once a Run-now produces correct drafts, disable the local task `firehouse-weekly-sales-report` (Cowork → Scheduled tasks) so it doesn't double-enqueue. Keep it — don't delete — until you've seen a real Monday cloud run land.
@@ -67,5 +71,5 @@ An earlier version committed a raw binary `logo_0.png`. Some git/CI clone enviro
 
 ## Honest caveats
 1. **Connector parity in the cloud** — Jarvio + Google Drive should behave the same headless, but the exact Jarvio tool set behaving identically is the thing to watch in the step-6 test run.
-2. **HTML→PDF fidelity** — the queue mailer renders the PDF with Google's `Blob.getAs('application/pdf')` converter, which is more limited than a browser. The report uses only converter-safe layout (inline-block cells, inline styles, no `<table>`), but spot-check that the first rendered PDF looks right — column alignment and the availability pills are the things most likely to shift. If a rendering issue appears, it is in the HTML/converter, not in the data.
+2. **HTML→PDF fidelity** — the queue mailer renders the PDF with Google's `Blob.getAs('application/pdf')` converter, which is more limited than a browser: it ignores CSS `background-color` and mishandles `inline-block`. The report is therefore **table-based with `bgcolor` fills and `border` accents**, which that converter (and Missive's email view) do honor. Still spot-check the first rendered PDF — confirm the red header bar, the green/red availability pills, and the zebra rows show their fills. If a fill is missing, it's the converter/HTML, not the data.
 3. **Profit method** — per-SKU fee rates are derived from a few settled days; the step-7 reconcile guard holds back any brand whose SKU profits don't sum to the orderMetrics total. Spot-check 2–3 brands' first drafts against Seller Central before trusting them unattended.
