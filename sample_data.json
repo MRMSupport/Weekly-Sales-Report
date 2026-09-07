@@ -1,1 +1,175 @@
-{"brand": "Zolli Candy (ZC)", "period": "June 21\u201327, 2026", "units": 2264, "units_sub": "across 25 SKUs", "revenue": 59823.42, "revenue_sub": "net ordered product sales", "profit": 33014.36, "profit_sub": "after actual Amazon fees", "products": [["Parent ASIN Product Line 1 \u2014 Long Title Variation", 37, 969.94, 605.86, 129, false], ["Parent ASIN Product Line 2 \u2014 Long Title Variation", 68, 800.59, 490.82, 967, true], ["Parent ASIN Product Line 3 \u2014 Long Title Variation", 169, 3404.96, 1562.15, 999, true], ["Parent ASIN Product Line 4 \u2014 Long Title Variation", 10, 365.86, 186.28, 1244, true], ["Parent ASIN Product Line 5 \u2014 Long Title Variation", 198, 6444.71, 3833.53, 545, false], ["Parent ASIN Product Line 6 \u2014 Long Title Variation", 187, 6294.13, 3559.48, 209, false], ["Parent ASIN Product Line 7 \u2014 Long Title Variation", 84, 754.23, 307.07, 1108, true], ["Parent ASIN Product Line 8 \u2014 Long Title Variation", 5, 190.26, 96.41, 443, true], ["Parent ASIN Product Line 9 \u2014 Long Title Variation", 111, 3466.23, 1898.58, 896, true], ["Parent ASIN Product Line 10 \u2014 Long Title Variation", 129, 3314.2, 1646.48, 1386, true], ["Parent ASIN Product Line 11 \u2014 Long Title Variation", 59, 1908.67, 1272.37, 44, false], ["Parent ASIN Product Line 12 \u2014 Long Title Variation", 109, 3793.47, 2108.44, 1315, true], ["Parent ASIN Product Line 13 \u2014 Long Title Variation", 28, 390.57, 264.77, 607, true], ["Parent ASIN Product Line 14 \u2014 Long Title Variation", 33, 1048.76, 682.49, 1456, true], ["Parent ASIN Product Line 15 \u2014 Long Title Variation", 131, 4973.56, 2577.25, 1372, true], ["Parent ASIN Product Line 16 \u2014 Long Title Variation", 51, 903.1, 509.82, 1022, true], ["Parent ASIN Product Line 17 \u2014 Long Title Variation", 132, 2717.53, 1736.29, 983, true], ["Parent ASIN Product Line 18 \u2014 Long Title Variation", 65, 2066.96, 1060.77, 1361, true], ["Parent ASIN Product Line 19 \u2014 Long Title Variation", 47, 928.15, 600.67, 1381, true], ["Parent ASIN Product Line 20 \u2014 Long Title Variation", 191, 3818.18, 1996.56, 1041, true], ["Parent ASIN Product Line 21 \u2014 Long Title Variation", 30, 987.3, 538.93, 805, true], ["Parent ASIN Product Line 22 \u2014 Long Title Variation", 97, 2296.01, 937.42, 89, false], ["Parent ASIN Product Line 23 \u2014 Long Title Variation", 81, 2471.17, 1668.76, 1214, true], ["Parent ASIN Product Line 24 \u2014 Long Title Variation", 151, 3109.87, 1392.28, 1028, true], ["Parent ASIN Product Line 25 \u2014 Long Title Variation", 61, 2405.01, 1480.88, 1105, true]], "disclaimer": "Profit is after per-order Amazon fees (referral, FBA fulfillment, and other per-item fees) only; it excludes advertising, storage, and other account-level fees and product cost, so actual net profit is lower.", "footer": "MegaRhino Marketing & Retail  |  www.megarhino.com  |  support@megarhino.com  |  828.222.3842"}
+{
+ "brand": "Demo Brand",
+ "period": "July 19–25, 2026",
+ "units": 4405,
+ "units_sub": "across 20 SKUs",
+ "revenue": 61100.0,
+ "revenue_sub": "net ordered product sales",
+ "profit": 35132.5,
+ "profit_sub": "~57% margin after actual Amazon fees",
+ "products": [
+  [
+   "Demo Product (Large, Black)",
+   900,
+   15000.0,
+   8625.0,
+   "4,100",
+   false
+  ],
+  [
+   "Demo Product (Large, Pink)",
+   320,
+   5400.0,
+   3105.0,
+   "3,700",
+   true
+  ],
+  [
+   "Demo Product (Large, Blue)",
+   300,
+   4800.0,
+   2760.0,
+   "3,900",
+   true
+  ],
+  [
+   "Demo Product (Large, Purple)",
+   250,
+   4000.0,
+   2300.0,
+   "2,500",
+   true
+  ],
+  [
+   "Demo Product (Small, Black)",
+   380,
+   3900.0,
+   2242.5,
+   "3,800",
+   true
+  ],
+  [
+   "Demo Product (X-Large, Black)",
+   200,
+   3200.0,
+   1840.0,
+   "2,100",
+   true
+  ],
+  [
+   "Demo Product (Small, Pink)",
+   290,
+   2900.0,
+   1667.5,
+   "3,000",
+   true
+  ],
+  [
+   "Demo Product (Small, Blue)",
+   260,
+   2600.0,
+   1495.0,
+   "2,300",
+   true
+  ],
+  [
+   "Demo Product (X-Large, Blue)",
+   160,
+   2500.0,
+   1437.5,
+   "1,900",
+   true
+  ],
+  [
+   "Demo Product (Small, Purple)",
+   220,
+   2200.0,
+   1265.0,
+   "2,000",
+   true
+  ],
+  [
+   "Demo Product (X-Large, Pink)",
+   120,
+   1700.0,
+   977.5,
+   "1,100",
+   true
+  ],
+  [
+   "Demo Product (XS, Purple)",
+   165,
+   1650.0,
+   948.75,
+   "1,500",
+   true
+  ],
+  [
+   "Demo Product (XS, Pink)",
+   160,
+   1600.0,
+   920.0,
+   "1,500",
+   true
+  ],
+  [
+   "Demo Product (XS, Black)",
+   150,
+   1500.0,
+   862.5,
+   "1,200",
+   true
+  ],
+  [
+   "Demo Product (XS, Blue)",
+   120,
+   1200.0,
+   690.0,
+   "1,000",
+   true
+  ],
+  [
+   "Demo Product (X-Large, Purple)",
+   85,
+   1150.0,
+   661.25,
+   "1,000",
+   true
+  ],
+  [
+   "Demo Product (2-Pack, Pink)",
+   110,
+   2000.0,
+   1150.0,
+   "950",
+   true
+  ],
+  [
+   "Demo Product (2-Pack, Blue)",
+   100,
+   1800.0,
+   1035.0,
+   "1,400",
+   true
+  ],
+  [
+   "Demo Product (2-Pack, Purple)",
+   70,
+   1200.0,
+   690.0,
+   "1,700",
+   true
+  ],
+  [
+   "Demo Product (2-Pack, Black)",
+   45,
+   800.0,
+   460.0,
+   "1,400",
+   true
+  ]
+ ],
+ "disclaimer": "Profit is after per-order Amazon fees (referral, FBA fulfillment, and other per-item fees) only; it excludes advertising, storage, and other account-level fees and product cost, so actual net profit is lower.",
+ "footer": "MegaRhino Marketing & Retail  |  www.megarhino.com  |  support@megarhino.com  |  828.222.3842",
+ "tagline": "Grow Your Brand On Amazon. Get Your Life Back."
+}
