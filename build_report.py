@@ -12,7 +12,7 @@ Apps Script queue mailer (`Blob.getAs('application/pdf')`) AND, for the cover
 note, shown as the email body in Missive. Both engines are weak: they IGNORE CSS
 `background-color` on divs/spans and mishandle `inline-block` layout. So every
 colored fill (KPI cards, the red header bar, the green/red availability pills,
-zebra rows, revenue bars) uses the HTML **`bgcolor` attribute** on table cells
+zebra rows) uses the HTML **`bgcolor` attribute** on table cells
 (with a matching inline style as belt-and-suspenders), borders use `border`
 (which both engines DO honor), and layout uses `<table>`. A white-background
 wrapper + light color-scheme meta keeps it readable in email dark mode.
@@ -170,43 +170,6 @@ def _product_table(products):
                'Performance by Product</td></tr>').format(ink=INK)
     table = ('<tr><td><table width="100%" cellpadding="0" cellspacing="0" border="0" '
              'style="border-collapse:collapse;"><tr>{h}</tr>{r}</table></td></tr>').format(h=head_cells, r=rows)
-    return heading + table
-
-
-def _legend_row():
-    def item(color, text):
-        return ('<td width="18" valign="middle"><table cellpadding="0" cellspacing="0" border="0"><tr>'
-                '<td width="16" height="9" bgcolor="{col}" style="background:{col};width:16px;height:9px;'
-                'font-size:1px;line-height:1px;">&nbsp;</td></tr></table></td>'
-                '<td valign="middle" style="font-size:9px;color:{gray};padding:0 24px 0 8px;">{t}</td>'
-                ).format(col=color, gray=GRAY, t=esc(text))
-    return ('<tr><td style="padding:12px 0 0 0;"><table cellpadding="0" cellspacing="0" border="0"><tr>'
-            + item(GREEN, "≥ 4 weeks of available inventory")
-            + item(REDLT, "< 4 weeks of available inventory")
-            + '</tr></table></td></tr>')
-
-
-def _revenue_chart(products):
-    top12 = sorted(products, key=lambda p: p[2], reverse=True)[:12]
-    maxrev = max((p[2] for p in top12), default=1) or 1
-    label = "Revenue by Product" + (" (top 12)" if len(products) > 12 else "")
-    bars = ""
-    for name, u, rev, prof, avail, green in top12:
-        pct = max(1, int(round(100.0 * (float(rev) / float(maxrev)))))
-        bar = ('<table width="{pct}%" cellpadding="0" cellspacing="0" border="0"><tr>'
-               '<td height="11" bgcolor="{red}" style="background:{red};height:11px;line-height:11px;font-size:1px;">'
-               '&nbsp;</td></tr></table>').format(pct=pct, red=RED)
-        bars += (
-            '<tr>'
-            '<td width="22%" align="right" style="font-size:9px;color:{gray};padding:0 8px 8px 0;">{nm}</td>'
-            '<td width="60%" style="padding:0 0 8px 0;">{bar}</td>'
-            '<td width="18%" style="font-size:9px;color:{gray};padding:0 0 8px 6px;">{rev}</td>'
-            '</tr>'
-        ).format(gray=GRAY, nm=esc(name), bar=bar, rev=esc(money(rev)))
-    heading = ('<tr><td style="padding:22px 0 12px 0;font-size:11.5px;font-weight:bold;color:{ink};">{label}</td></tr>'
-               ).format(ink=INK, label=esc(label))
-    table = ('<tr><td><table width="100%" cellpadding="0" cellspacing="0" border="0">{bars}</table></td></tr>'
-             ).format(bars=bars)
     return heading + table
 
 
