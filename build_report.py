@@ -221,7 +221,7 @@ def _footer_row(data):
 def render_report(data):
     products = [tuple(p) for p in data["products"]]
     inner = (_header_rows(data) + _kpi_cards(data) + _disclaimer_row(data)
-             + _product_table(products) + _legend_row() + _revenue_chart(products)
+             + _product_table(products)
              + _footer_row(data))
     return _doc(inner)
 
