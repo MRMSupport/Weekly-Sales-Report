@@ -49,7 +49,6 @@ DATA = {
     "disclaimer": ("Profit is after per-order Amazon fees (referral, FBA fulfillment, and other "
                    "per-item fees) only; it excludes advertising, storage, and other account-level "
                    "fees and product cost, so actual net profit is lower."),
-    "footer": "MegaRhino Marketing & Retail  |  www.megarhino.com  |  support@megarhino.com  |  828.222.3842",
 }
 
 
@@ -221,8 +220,7 @@ def _footer_row(data):
 def render_report(data):
     products = [tuple(p) for p in data["products"]]
     inner = (_header_rows(data) + _kpi_cards(data) + _disclaimer_row(data)
-             + _product_table(products)
-             + _footer_row(data))
+             + _product_table(products))
     return _doc(inner)
 
 
@@ -240,7 +238,7 @@ def render_cover(data):
                       ).format(card=CARD, red=RED, mute=MUTE, ink=INK, lab=esc(lab.upper()), val=esc(val))
     note = ('<tr><td style="padding:2px 0 4px 0;font-size:13px;color:{ink};line-height:1.5;">'
             'Here is the <b>{brand}</b> weekly sales report for <b>{period}</b>. '
-            'A summary is below; full per-SKU detail is in the attached PDF.</td></tr>'
+            'A summary is provided below, with the full SKU breakdown in the attached PDF.</td></tr>'
             ).format(ink=INK, brand=esc(data["brand"]), period=esc(data["period"]))
     kpi_row = ('<tr><td style="padding:14px 0 0 0;"><table width="100%" cellpadding="0" cellspacing="0" '
                'border="0"><tr>{c}</tr></table></td></tr>').format(c=kpi_cells)
@@ -249,7 +247,7 @@ def render_cover(data):
         margin_line = ('<tr><td style="padding:8px 0 0 0;font-size:11px;color:{gray};">{s}</td></tr>'
                        ).format(gray=GRAY, s=esc(data["profit_sub"]))
     inner = (_header_rows(data) + note + kpi_row + margin_line
-             + _disclaimer_row(data) + _footer_row(data))
+             + _disclaimer_row(data))
     return _doc(inner)
 
 
